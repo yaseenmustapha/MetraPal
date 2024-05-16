@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import Snap
 
 struct TrainPosition: Codable, Identifiable {
     let id: String
@@ -34,32 +35,39 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
-                Map(position: .constant(.region(region))) {
-                    ForEach(trainPositions) { trainPosition in
-                        Annotation(trainPosition.id, coordinate: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude)) {
-                            VStack{
-                                Text(trainPosition.id)
-                                Text("🚆")
-                                    .font(.title)
-                            }
+        
+        ZStack {
+            Map(position: .constant(.region(region))) {
+                ForEach(trainPositions) { trainPosition in
+                    Annotation(trainPosition.id, coordinate: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude)) {
+                        VStack{
+                            Text(trainPosition.id)
+                            Text("🚆")
+                                .font(.title)
                         }
                     }
                 }
-                .frame(height: 300)
+            }
+            
+            SnapDrawer(large: .paddingToTop(24), medium: .fraction(0.4), tiny: .height(100), allowInvisible: false) { state in
                 
                 List(trainPositions, id: \.id) { trainPosition in
                     VStack(alignment: .leading) {
                         Text("Train ID: \(trainPosition.id)")
                         Text("Latitude: \(trainPosition.vehicle.position.latitude)")
                         Text("Longitude: \(trainPosition.vehicle.position.longitude)")
-                    }
+                    }.listRowBackground(Color.clear)
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                
+                
             }
-            .onAppear(perform: fetchData)
-            .navigationTitle("MetraPal")
-        }
+        }.onAppear(perform: {
+            fetchData()
+        })
+        
+        
     }
     
     func fetchData() {

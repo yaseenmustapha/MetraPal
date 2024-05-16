@@ -1,0 +1,15 @@
+{
+  "originHash" : "6dc3b7846b806fd81cf3d41bb5eb501a0a2e7228e8834d75fd527c0c023021f2",
+  "pins" : [
+    {
+      "identity" : "snap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nerdsupremacist/Snap.git",
+      "state" : {
+        "revision" : "29943b7064547f391ea8352dea04903e2263d831",
+        "version" : "0.2.2"
+      }
+    }
+  ],
+  "version" : 3
+}

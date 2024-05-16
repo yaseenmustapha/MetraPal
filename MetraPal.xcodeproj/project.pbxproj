@@ -11,6 +11,7 @@
 		08523EE82BE862C2008CA08F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08523EE72BE862C2008CA08F /* ContentView.swift */; };
 		08523EEA2BE862C3008CA08F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 08523EE92BE862C3008CA08F /* Assets.xcassets */; };
 		08523EED2BE862C3008CA08F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 08523EEC2BE862C3008CA08F /* Preview Assets.xcassets */; };
+		08523EF52BF18CEA008CA08F /* Snap in Frameworks */ = {isa = PBXBuildFile; productRef = 08523EF42BF18CEA008CA08F /* Snap */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				08523EF52BF18CEA008CA08F /* Snap in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,6 +85,9 @@
 			dependencies = (
 			);
 			name = MetraPal;
+			packageProductDependencies = (
+				08523EF42BF18CEA008CA08F /* Snap */,
+			);
 			productName = MetraPal;
 			productReference = 08523EE22BE862C2008CA08F /* MetraPal.app */;
 			productType = "com.apple.product-type.application";
@@ -111,6 +116,9 @@
 				Base,
 			);
 			mainGroup = 08523ED92BE862C2008CA08F;
+			packageReferences = (
+				08523EF32BF18CEA008CA08F /* XCRemoteSwiftPackageReference "Snap" */,
+			);
 			productRefGroup = 08523EE32BE862C2008CA08F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -342,6 +350,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		08523EF32BF18CEA008CA08F /* XCRemoteSwiftPackageReference "Snap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/nerdsupremacist/Snap.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		08523EF42BF18CEA008CA08F /* Snap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 08523EF32BF18CEA008CA08F /* XCRemoteSwiftPackageReference "Snap" */;
+			productName = Snap;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 08523EDA2BE862C2008CA08F /* Project object */;
 }
