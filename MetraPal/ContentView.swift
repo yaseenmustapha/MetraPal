@@ -9,22 +9,48 @@ import SwiftUI
 import MapKit
 import Snap
 
+enum MetraLine: String, Codable, CaseIterable, Identifiable {
+    case ME = "ME"
+    case RI = "RI"
+    case SWS = "SWS"
+    case HC = "HC"
+    case BNSF = "BNSF"
+    case UPW = "UP-W"
+    case MDW = "MD-W"
+    case UPNW = "UP-NW"
+    case NCS = "NCS"
+    case MDN = "MD-N"
+    case UPN = "UP-N"
+    
+    var id: Self { self }
+}
+
 struct TrainPosition: Codable, Identifiable {
     let id: String
     let vehicle: VehicleDetails
 }
 
 struct VehicleDetails: Codable {
+    let trip: TripDetails
     let position: PositionDetails
 }
+
+struct TripDetails: Codable {
+    let routeId: MetraLine
+}
+
 
 struct PositionDetails: Codable {
     let latitude: Double
     let longitude: Double
+    let bearing: Int
 }
 
 struct ContentView: View {
+    @State private var drawerSize: AppleMapsSnapState = .medium
     @State private var trainPositions: [TrainPosition] = []
+    @State private var selectedMetraLine: MetraLine = .UPW
+    
     let coordinate = CLLocationCoordinate2D(latitude: 41.8781, longitude: -88)
     
     private var region: MKCoordinateRegion {
@@ -38,7 +64,7 @@ struct ContentView: View {
         
         ZStack {
             Map(position: .constant(.region(region))) {
-                ForEach(trainPositions) { trainPosition in
+                ForEach(filteredTrainPositions) { trainPosition in
                     Annotation(trainPosition.id, coordinate: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude)) {
                         VStack{
                             Text(trainPosition.id)
@@ -49,25 +75,34 @@ struct ContentView: View {
                 }
             }
             
-            SnapDrawer(large: .paddingToTop(24), medium: .fraction(0.4), tiny: .height(100), allowInvisible: false) { state in
-                
-                List(trainPositions, id: \.id) { trainPosition in
-                    VStack(alignment: .leading) {
-                        Text("Train ID: \(trainPosition.id)")
-                        Text("Latitude: \(trainPosition.vehicle.position.latitude)")
-                        Text("Longitude: \(trainPosition.vehicle.position.longitude)")
-                    }.listRowBackground(Color.clear)
+            SnapDrawer(state: $drawerSize, large: .paddingToTop(12), medium: .fraction(0.58), tiny: .height(150), allowInvisible: false) { state in
+                VStack {
+                    Picker("Metra Line", selection: $selectedMetraLine) {
+                        ForEach(MetraLine.allCases) { metraLine in
+                            Text(metraLine.rawValue).tag(metraLine.rawValue)
+                        }
+                    }
+                    
+                    List(filteredTrainPositions, id: \.id) { trainPosition in
+                        VStack(alignment: .leading) {
+                            Text("Metra Line: \(trainPosition.vehicle.trip.routeId.rawValue)")
+                                .font(.title3)
+                            Text("Train ID: \(trainPosition.id)")
+                            Text("Latitude: \(trainPosition.vehicle.position.latitude)")
+                            Text("Longitude: \(trainPosition.vehicle.position.longitude)")
+                            Text("Bearing: \(trainPosition.vehicle.position.bearing)")
+                        }.listRowBackground(Color.clear)
+                    }
+                    .scrollContentBackground(.hidden)
                 }
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                
-                
             }
         }.onAppear(perform: {
             fetchData()
         })
-        
-        
+    }
+    
+    var filteredTrainPositions: [TrainPosition] {
+        return trainPositions.filter { $0.vehicle.trip.routeId == selectedMetraLine }
     }
     
     func fetchData() {
