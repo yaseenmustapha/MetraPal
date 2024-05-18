@@ -16,6 +16,19 @@ struct ShapePoint: Codable {
     let shapePtSequence: Int
 }
 
+// extend Color struct to accept hex values
+extension Color {
+    init(hex: UInt, alpha: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255.0,
+            green: Double((hex >> 8) & 0xFF) / 255.0,
+            blue: Double(hex & 0xFF) / 255.0,
+            opacity: alpha
+        )
+    }
+}
+
 enum MetraLine: String, Codable, CaseIterable, Identifiable {
     case All = "All Metra Lines"
     case ME = "ME"
@@ -31,6 +44,35 @@ enum MetraLine: String, Codable, CaseIterable, Identifiable {
     case UPN = "UP-N"
     
     var id: Self { self }
+    
+    var color: Color {
+        switch self {
+        case .All:
+            return .blue
+        case .ME:
+            return Color(hex: 0xFF4E00)
+        case .RI:
+            return Color(hex: 0xE1261D)
+        case .SWS:
+            return Color(hex: 0x005EB9)
+        case .HC:
+            return Color(hex: 0x8B1E41)
+        case .BNSF:
+            return Color(hex: 0x3DAF2C)
+        case .UPW:
+            return Color(hex: 0xFFB2B9)
+        case .MDW:
+            return Color(hex: 0xF4B24A)
+        case .UPNW:
+            return Color(hex: 0xFEDE02)
+        case .NCS:
+            return Color(hex: 0x62319F)
+        case .MDN:
+            return Color(hex: 0xE97200)
+        case .UPN:
+            return Color(hex: 0x0D5200)
+        }
+    }
 }
 
 struct StopTime: Codable, Identifiable {
@@ -72,12 +114,14 @@ struct PositionDetails: Codable {
 }
 
 struct ContentView: View {
+    @State private var position: MapCameraPosition = .automatic
+    
     @State private var shapePoints: [String: [CLLocationCoordinate2D]] = [:]
     
     @StateObject private var viewModel = ContentViewModel()
     @State private var drawerSize: AppleMapsSnapState = .medium
     @State private var trainPositions: [TrainPosition] = []
-    @State private var selectedMetraLine: MetraLine = .UPW
+    @State private var selectedMetraLine: MetraLine = .All
     @State private var selectedTripId: String? = nil
     @State private var selectedTripStopTimes: [StopTime] = []
     
@@ -93,20 +137,25 @@ struct ContentView: View {
     var body: some View {
         
         ZStack {
-            Map(position: .constant(.region(region))) {
+            Map(position: $position) {
                 // Draw shape points for all shape IDs:
-                if (selectedMetraLine == .All) {
-                    ForEach(shapePoints.keys.sorted(), id: \.self) { shapeId in
-                        MapPolyline(coordinates: shapePoints[shapeId] ?? [])
-                            .stroke(.blue, lineWidth: 4)
+                if selectedMetraLine == .All {
+                    ForEach(MetraLine.allCases, id: \.self) { metraLine in
+                        ForEach(shapePoints.keys.sorted(), id: \.self) { shapeId in
+                            if shapeId.hasPrefix(metraLine.rawValue) {
+                                MapPolyline(coordinates: shapePoints[shapeId] ?? [])
+                                    .stroke(metraLine.color, lineWidth: 3)
+                            }
+                        }
                     }
                 }
+                
                 
                 // Draw all lines for the selected metra line. selectedMetraLine should be the prefix of the shape ID. Ex: "UP-W_IB_1" and "UP-W_OB_1" are shape IDs for the UP-W line.
                 ForEach(shapePoints.keys.sorted(), id: \.self) { shapeId in
                     if shapeId.hasPrefix(selectedMetraLine.rawValue) {
                         MapPolyline(coordinates: shapePoints[shapeId] ?? [])
-                            .stroke(.blue, lineWidth: 4)
+                            .stroke(selectedMetraLine.color, lineWidth: 4)
                     }
                 }
                 
@@ -122,6 +171,17 @@ struct ContentView: View {
                 }
                 
                 UserAnnotation()
+            }
+            .safeAreaInset(edge: .bottom) {
+                // push bottom of map up
+                VStack {}.padding(.top, 260)
+            }
+            .safeAreaInset(edge: .top) {
+                // push controls down
+                VStack {}.padding(.top, 20)
+            }
+            .onChange(of: selectedMetraLine) {
+                position = .automatic
             }
             .onAppear {
                 viewModel.checkIfLocationServicesIsEnabled()
