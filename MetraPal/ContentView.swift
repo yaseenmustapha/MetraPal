@@ -116,6 +116,7 @@ struct VehicleDetails: Codable {
 struct TripDetails: Codable {
     let tripId: String
     let routeId: MetraLine
+    let startTime: String
 }
 
 
@@ -193,10 +194,12 @@ struct ContentView: View {
                             // small font size
                             Text(trainPosition.id)
                                 .font(.system(size: 9))
+                                .foregroundColor(.white)
                                 .offset(y: -3)
                                 
                             
                             Image(systemName: "arrow.up")
+                                .foregroundColor(.accentColor)
                                 .rotationEffect(.degrees(Double(trainPosition.vehicle.position.bearing)))
                                 .offset(x: offsetForBearing(bearing: trainPosition.vehicle.position.bearing).x, y: offsetForBearing(bearing: trainPosition.vehicle.position.bearing).y)
                         }
@@ -214,7 +217,9 @@ struct ContentView: View {
                 VStack {}.padding(.top, 20)
             }
             .onChange(of: selectedMetraLine) {
-                position = .automatic
+                withAnimation() {
+                    position = .automatic
+                }
             }
             .onAppear {
                 viewModel.checkIfLocationServicesIsEnabled()
@@ -231,7 +236,9 @@ struct ContentView: View {
                             HStack{
                                 Button(action: {
                                     selectedTripId = nil
-                                    position = .automatic
+                                    withAnimation() {
+                                        position = .automatic
+                                    }
                                 }) {
                                     Image(systemName: "chevron.left")
                                     Text("Back")
@@ -250,7 +257,7 @@ struct ContentView: View {
                                 Text(stopTime.stopId)
                                     .font(.title3)
                                 Text("Stop Sequence: \(stopTime.stopSequence)")
-                                Text("Arrival Time: \(formatTime(time: stopTime.arrivalTime))")
+                                Text("Arrival Time: \(Utilities.formatTime(time: stopTime.arrivalTime))")
                             }
                             .listRowBackground(Color.clear)
                         }
@@ -266,30 +273,48 @@ struct ContentView: View {
                         
                         if (filteredTrainPositions.isEmpty) {
                             Spacer()
-                            Text("No trains found for the \(selectedMetraLine.rawValue) metra line")
+                            if (selectedMetraLine == .All) {
+                                Text("No metra trains found.")
+                            } else {
+                                Text("No trains found for the \(selectedMetraLine.rawValue) metra line.")
+                            }
                             Spacer()
                         } else {
                             List(filteredTrainPositions, id: \.id) { trainPosition in
-                                VStack(alignment: .leading) {
-                                    if (selectedMetraLine == .All) {
-                                        Text("Metra Line: \(trainPosition.vehicle.trip.routeId.rawValue)")
-                                            .font(.title3)
+                                HStack {
+                                    ZStack {
+                                        Text("🚆")
+                                            .font(.system(size: 48))
+                                        
+                                        // small font size
+                                        Text(trainPosition.id)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.white)
+                                            .offset(y: -6)
                                     }
-                                    Text("Train #\(trainPosition.id)")
-                                        .font(.title3)
-                                    Text("Latitude: \(trainPosition.vehicle.position.latitude)")
-                                    Text("Longitude: \(trainPosition.vehicle.position.longitude)")
-                                    Text("Bearing: \(trainPosition.vehicle.position.bearing)")
+                                    VStack(alignment: .leading) {
+                                        if (selectedMetraLine == .All) {
+                                            Text("Metra Line: \(trainPosition.vehicle.trip.routeId.rawValue)")
+                                                .font(.title3)
+                                        }
+                                        Text("Train #\(trainPosition.id)")
+                                            .font(.title3)
+                                        Text("Trip start time: \(Utilities.formatTime(time: trainPosition.vehicle.trip.startTime))")
+                                        Text("Lat: \(trainPosition.vehicle.position.latitude)°, Long: \(trainPosition.vehicle.position.longitude)°")
+                                        Text("Bearing: \(trainPosition.vehicle.position.bearing)°")
+                                    }
                                 }
                                 .listRowBackground(Color.clear)
                                 .onTapGesture {
                                     selectedTripId = trainPosition.vehicle.trip.tripId
                                     fetchStopTimes(tripId: trainPosition.vehicle.trip.tripId)
-                                    position = .region(
-                                        MKCoordinateRegion(
-                                            center: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude),
-                                            span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
-                                    )
+                                    withAnimation() {
+                                        position = .region(
+                                            MKCoordinateRegion(
+                                                center: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude),
+                                                span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
+                                        )
+                                    }
                                 }
                             }
                             .listStyle(.plain)
@@ -301,7 +326,7 @@ struct ContentView: View {
                 }
             }
         }.onAppear(perform: {
-            fetchData()
+            fetchPositions()
             fetchShapePoints()
             fetchStations()
             startRefetchTimer()
@@ -320,7 +345,7 @@ struct ContentView: View {
     
     func startRefetchTimer() {
         refetchTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-            fetchData()
+            fetchPositions()
         }
     }
     
@@ -336,174 +361,49 @@ struct ContentView: View {
         return trainPositions.filter { $0.vehicle.trip.routeId == selectedMetraLine }
     }
     
-    func fetchData() {
-        guard let url = URL(string: "https://gtfsapi.metrarail.com/gtfs/positions") else {
-            print("Invalid URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        
-        let username = "24adf46e6f327dfbf5510fa8eb4bd625"
-        let password = "475115b80ded9d9944b0f0d50a3e6835"
-        let loginString = "\(username):\(password)"
-        let loginData = loginString.data(using: .utf8)!
-        let base64LoginString = loginData.base64EncodedString()
-        
-        request.setValue("Basic \(base64LoginString)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Error fetching data: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
-            do {
-                let jsonString = String(data: data, encoding: .utf8) ?? "Data not in UTF-8 format"
-                print("JSON Data: \(jsonString)")
-                
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let trainPositions = try decoder.decode([TrainPosition].self, from: data)
+    func fetchPositions() {
+        APIService.shared.fetchData(from: "/positions") { (result: Result<[TrainPosition], Error>) in
+            switch result {
+            case .success(let trainPositions):
                 DispatchQueue.main.async {
                     self.trainPositions = trainPositions
                 }
-            } catch {
-                print("Error decoding JSON: \(error.localizedDescription)")
+            case .failure(let error):
+                print("Error fetching data: \(error.localizedDescription)")
             }
-        }.resume()
+        }
     }
     
-    // fetch the metra stations
     func fetchStations() {
-        guard let url = URL(string: "https://gtfsapi.metrarail.com/gtfs/schedule/stops") else {
-            print("Invalid URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        
-        let username = "24adf46e6f327dfbf5510fa8eb4bd625"
-        let password = "475115b80ded9d9944b0f0d50a3e6835"
-        let loginString = "\(username):\(password)"
-        let loginData = loginString.data(using: .utf8)!
-        let base64LoginString = loginData.base64EncodedString()
-        
-        request.setValue("Basic \(base64LoginString)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Error fetching data: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
-            do {
-                let jsonString = String(data: data, encoding: .utf8) ?? "Data not in UTF-8 format"
-                print("JSON Data: \(jsonString)")
-                
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let stations = try decoder.decode([Station].self, from: data)
+        APIService.shared.fetchData(from: "/schedule/stops") { (result: Result<[Station], Error>) in
+            switch result {
+            case .success(let stations):
                 DispatchQueue.main.async {
                     self.stations = stations
                 }
-            } catch {
-                print("Error decoding JSON: \(error.localizedDescription)")
+            case .failure(let error):
+                print("Error fetching data: \(error.localizedDescription)")
             }
-        }.resume()
+        }
     }
     
-    
-    // fetch stop times for given trip id
     func fetchStopTimes(tripId: String) {
-        guard let url = URL(string: "https://gtfsapi.metrarail.com/gtfs/schedule/stop_times/\(tripId)") else {
-            print("Invalid URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        
-        let username = "24adf46e6f327dfbf5510fa8eb4bd625"
-        let password = "475115b80ded9d9944b0f0d50a3e6835"
-        let loginString = "\(username):\(password)"
-        let loginData = loginString.data(using: .utf8)!
-        let base64LoginString = loginData.base64EncodedString()
-        
-        request.setValue("Basic \(base64LoginString)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Error fetching data: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
-            do {
-                let jsonString = String(data: data, encoding: .utf8) ?? "Data not in UTF-8 format"
-                print("JSON Data: \(jsonString)")
-                
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let stopTimes = try decoder.decode([StopTime].self, from: data)
+        APIService.shared.fetchData(from: "/schedule/stop_times/\(tripId)") { (result: Result<[StopTime], Error>) in
+            switch result {
+            case .success(let stopTimes):
                 DispatchQueue.main.async {
                     self.selectedTripStopTimes = stopTimes
                 }
-            } catch {
-                print("Error decoding JSON: \(error.localizedDescription)")
+            case .failure(let error):
+                print("Error fetching data: \(error.localizedDescription)")
             }
-        }.resume()
+        }
     }
     
     func fetchShapePoints() {
-        guard let url = URL(string: "https://gtfsapi.metrarail.com/gtfs/schedule/shapes") else {
-            print("Invalid URL")
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        
-        let username = "24adf46e6f327dfbf5510fa8eb4bd625"
-        let password = "475115b80ded9d9944b0f0d50a3e6835"
-        let loginString = "\(username):\(password)"
-        let loginData = loginString.data(using: .utf8)!
-        let base64LoginString = loginData.base64EncodedString()
-        
-        request.setValue("Basic \(base64LoginString)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Error fetching data: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let shapePoints = try decoder.decode([ShapePoint].self, from: data)
-                
+        APIService.shared.fetchData(from: "/schedule/shapes") { (result: Result<[ShapePoint], Error>) in
+            switch result {
+            case .success(let shapePoints):
                 // Group shape points by shapeId
                 let groupedShapePoints = Dictionary(grouping: shapePoints, by: { $0.shapeId })
                 
@@ -517,23 +417,10 @@ struct ContentView: View {
                 DispatchQueue.main.async {
                     self.shapePoints = coordinatesByShapeId
                 }
-            } catch {
-                print("Error decoding shape JSON: \(error.localizedDescription)")
+            case .failure(let error):
+                print("Error fetching data: \(error.localizedDescription)")
             }
-        }.resume()
-    }
-    
-    func formatTime(time: String) -> String {
-        // check if time is in 24 hour format (sometimes API gives something like 25:00:00)
-        if time.count == 8 {
-            return "Invalid time format"
         }
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm:ss"
-        let date = dateFormatter.date(from: time)
-        
-        dateFormatter.dateFormat = "h:mm a"
-        return dateFormatter.string(from: date!)
     }
     
 }
