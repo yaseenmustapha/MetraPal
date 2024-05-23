@@ -196,12 +196,23 @@ struct ContentView: View {
                                 .font(.system(size: 9))
                                 .foregroundColor(.white)
                                 .offset(y: -3)
-                                
+                            
                             
                             Image(systemName: "arrow.up")
                                 .foregroundColor(.accentColor)
                                 .rotationEffect(.degrees(Double(trainPosition.vehicle.position.bearing)))
                                 .offset(x: offsetForBearing(bearing: trainPosition.vehicle.position.bearing).x, y: offsetForBearing(bearing: trainPosition.vehicle.position.bearing).y)
+                        }
+                        .onTapGesture {
+                            selectedTripId = trainPosition.vehicle.trip.tripId
+                            fetchStopTimes(tripId: trainPosition.vehicle.trip.tripId)
+                            withAnimation() {
+                                position = .region(
+                                    MKCoordinateRegion(
+                                        center: CLLocationCoordinate2D(latitude: trainPosition.vehicle.position.latitude, longitude: trainPosition.vehicle.position.longitude),
+                                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1))
+                                )
+                            }
                         }
                     }.annotationTitles(Visibility.hidden)
                 }
@@ -252,17 +263,30 @@ struct ContentView: View {
                             }
                         }
                         
-                        List(selectedTripStopTimes, id: \.id) { stopTime in
-                            VStack(alignment: .leading) {
-                                Text(stopTime.stopId)
-                                    .font(.title3)
-                                Text("Stop Sequence: \(stopTime.stopSequence)")
-                                Text("Arrival Time: \(Utilities.formatTime(time: stopTime.arrivalTime))")
+                        ScrollViewReader { proxy in
+                            List(selectedTripStopTimes, id: \.id) { stopTime in
+                                VStack(alignment: .leading) {
+                                    Text(stopTime.stopId)
+                                        .font(.title3)
+                                        .foregroundColor(getTextColor(for: stopTime.arrivalTime))
+                                    Text("Stop Sequence: \(stopTime.stopSequence)")
+                                        .foregroundColor(getTextColor(for: stopTime.arrivalTime))
+                                    Text("Arrival Time: \(Utilities.formatTime(time: stopTime.arrivalTime)) (\(Utilities.timeUntil(time: stopTime.arrivalTime)))")
+                                        .foregroundColor(getTextColor(for: stopTime.arrivalTime))
+                                }
+                                .listRowBackground(Color.clear)
+                                .id(stopTime.id) // Ensure each row has a unique ID for scrolling
                             }
-                            .listRowBackground(Color.clear)
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
+                            .onAppear {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    withAnimation() {
+                                        scrollToNearestFutureStopTime(using: proxy)
+                                    }
+                                }
+                            }
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
                         
                     } else {
                         Picker("Metra Line", selection: $selectedMetraLine) {
@@ -336,6 +360,26 @@ struct ContentView: View {
         })
     }
     
+    // Helper function to scroll to the nearest future stop time
+    func scrollToNearestFutureStopTime(using proxy: ScrollViewProxy) {
+        if let nearestFutureStopTime = selectedTripStopTimes.first(where: { !Utilities.isPast(time: $0.arrivalTime) }) {
+            proxy.scrollTo(nearestFutureStopTime.id, anchor: .center)
+        } else if let lastStopTime = selectedTripStopTimes.last {
+            proxy.scrollTo(lastStopTime.id, anchor: .center)
+        }
+    }
+    
+    
+    // Helper function to determine the text color
+    func getTextColor(for time: String) -> Color {
+        let timeUntil = Utilities.timeUntil(time: time)
+        if timeUntil == "Now" {
+            return .blue
+        } else {
+            return Utilities.isPast(time: time) ? .secondary : .primary
+        }
+    }
+    
     func offsetForBearing(bearing: Int) -> CGPoint {
         let offset: CGFloat = 20
         let x = offset * CGFloat(sin(Double(bearing) * Double.pi / 180))
@@ -344,8 +388,11 @@ struct ContentView: View {
     }
     
     func startRefetchTimer() {
-        refetchTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+        refetchTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
             fetchPositions()
+            if (selectedTripId != nil) {
+                fetchStopTimes(tripId: selectedTripId!)
+            }
         }
     }
     
