@@ -13,8 +13,8 @@ class APIService {
     static let shared = APIService()
     
     private let baseURL = "https://gtfsapi.metrarail.com/gtfs"
-    private let username = "24adf46e6f327dfbf5510fa8eb4bd625"
-    private let password = "475115b80ded9d9944b0f0d50a3e6835"
+    private let username = ""
+    private let password = ""
 //    private let username = Bundle.main.object(forInfoDictionaryKey: "METRA_API_USERNAME")! as! String
 //    private let password = Bundle.main.object(forInfoDictionaryKey: "METRA_API_PASSWORD")! as! String
     
